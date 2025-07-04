@@ -1,8 +1,10 @@
 // index.js (CommonJS style)
 const express = require('express');
 const cors = require('cors');
+const Stripe = require('stripe')
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = Stripe(process.env.STRIPE_KEY)
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -40,6 +42,7 @@ async function run() {
       res.send(result)
     })
 
+
     app.get('/parcels', async (req, res) => {
       const userEmail = req.query.email
       const query = userEmail ? { created_by: userEmail } : {}
@@ -51,9 +54,23 @@ async function run() {
       res.send(result)
     })
 
-    app.delete('/parcels/:id', async (req, res) => {
+    app.get('/parcels/:id', async (req, res) => {
+      const { id } = req.params;
+ 
+
+      try {
+        const parcel = await parcelCollection.findOne({ _id: new ObjectId(id) });
+ 
+        res.send(parcel);
+      } catch (err) {
+        res.status(500).send({ message: 'Server error', error: err.message });
+      }
+    });
+
+
+    app.delete('parcels/:id', async (req, res) => {
       const id = req.params.id;
-      
+
       try {
         const result = await parcelCollection.deleteOne({ _id: new ObjectId(id) });
 
@@ -62,6 +79,24 @@ async function run() {
         res.status(500).send({ success: false, message: 'Internal Server Error', error: error.message });
       }
     });
+
+    app.post('/create-payment-intent', async (req, res) => {
+
+      const amount = req.body.amount
+
+      try {
+        const paymentIn = await stripe.paymentIntents.create({
+          amount: amount * 100, // e.g. 100 = 1.00 USD
+          currency: 'usd',
+          payment_method_types: ['card'],
+        })
+        res.send(paymentIn)
+      }
+      catch (err) {
+        res.status(500).send({ error: err.message });
+      }
+
+    })
 
 
 
