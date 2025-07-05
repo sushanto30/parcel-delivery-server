@@ -35,6 +35,7 @@ async function run() {
 
     const db = client.db("sellToCustomer");
     const parcelCollection = db.collection("Parcels");
+    const paymentsCollection = db.collection('payments')
 
     app.post('/addParcels', async (req, res) => {
       const parcelData = req.body
@@ -56,11 +57,11 @@ async function run() {
 
     app.get('/parcels/:id', async (req, res) => {
       const { id } = req.params;
- 
+
 
       try {
         const parcel = await parcelCollection.findOne({ _id: new ObjectId(id) });
- 
+
         res.send(parcel);
       } catch (err) {
         res.status(500).send({ message: 'Server error', error: err.message });
@@ -97,6 +98,45 @@ async function run() {
       }
 
     })
+
+    app.post('/payments', async (req, res) => {
+
+      const paymentData = req.body;
+
+      const paymentResult = await paymentsCollection.insertOne(paymentData)
+
+      const query = { _id: new ObjectId(paymentData.parcelId) }
+
+      await parcelCollection.updateOne(query, { $set: { payment_status: "paid" } })
+
+      res.send(paymentResult)
+
+
+    })
+
+    app.get('/payments', async (req, res) => {
+      try {
+        const email = req.query.email;
+
+        if (!email) {
+          return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const query = { email };
+        const options = {
+          sort: { date: -1 } // সর্বশেষ পেমেন্ট আগে দেখাবে
+        };
+
+        const payments = await paymentsCollection.find(query, options).toArray();
+
+        // res.status(200).json(payments);
+        res.send(payments)
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
 
 
 
